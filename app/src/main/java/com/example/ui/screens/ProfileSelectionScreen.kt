@@ -1,6 +1,11 @@
 package com.example.ui.screens
 
 import android.graphics.Color.parseColor
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,6 +37,7 @@ import com.example.utils.ProfileUtils
 import java.util.Calendar
 import com.example.ui.utils.HapticType
 import com.example.ui.utils.rememberHapticHelper
+import androidx.compose.foundation.LocalIndication
 
 val PROFILE_COLORS = listOf(
     "#7C5CFF", "#FF5C5C", "#5CFFB6", "#FFB65C", "#5CBAFF"
@@ -189,28 +195,52 @@ fun ProfileCard(profile: ProfileEntity, onClick: () -> Unit, onLongClick: () -> 
         MaterialTheme.colorScheme.primary
     }
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+        label = "scale"
+    )
+
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer(scaleX = scale, scaleY = scale),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
                 .aspectRatio(1f)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(32.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+                .clip(RoundedCornerShape(36.dp))
+                .background(color.copy(alpha = 0.12f))
+                .border(1.dp, color.copy(alpha = 0.2f), RoundedCornerShape(36.dp))
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = LocalIndication.current,
+                    onClick = onClick, 
+                    onLongClick = onLongClick
+                ),
             contentAlignment = Alignment.Center
         ) {
-            Box(modifier = Modifier.fillMaxSize().background(color.copy(alpha = 0.1f)))
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            colors = listOf(color.copy(alpha = 0.2f), Color.Transparent)
+                        )
+                    )
+            )
             Text(
                 text = profile.name.take(1).uppercase(),
                 fontSize = 56.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.Light,
                 color = color
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
         Text(
             text = profile.name,
             style = MaterialTheme.typography.titleMedium,
@@ -222,32 +252,47 @@ fun ProfileCard(profile: ProfileEntity, onClick: () -> Unit, onLongClick: () -> 
 
 @Composable
 fun AddProfileCard(onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+        label = "scale"
+    )
+
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer(scaleX = scale, scaleY = scale),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
                 .aspectRatio(1f)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(32.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                .clickable { onClick() },
+                .clip(RoundedCornerShape(36.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                .border(1.dp, MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(36.dp))
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = androidx.compose.foundation.LocalIndication.current,
+                    onClick = onClick
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
                 contentDescription = "Přidat profil",
                 modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onSurface
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
         Text(
-            text = "Přidat profil",
+            text = "Přidat",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         )
     }
 }

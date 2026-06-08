@@ -13,6 +13,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -410,72 +413,83 @@ fun BrowserScreen(
         }
 
         // BOTTOM BAR
-        BottomAppBar(
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .offset { IntOffset(0, -bottomBarOffset.roundToInt()) },
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentPadding = PaddingValues(horizontal = 8.dp)
+                .offset { IntOffset(0, -bottomBarOffset.roundToInt()) }
+                .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(32.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f))
+                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), RoundedCornerShape(32.dp)),
+            contentAlignment = Alignment.Center
         ) {
-            IconButton(onClick = { activeWebView?.goBack() }) {
-                Icon(Icons.Default.ArrowBack, "Zpět")
-            }
-            IconButton(onClick = { activeWebView?.goForward() }) {
-                Icon(Icons.Default.ArrowForward, "Vpřed")
-            }
-            Spacer(Modifier.weight(1f))
-            
-            // Tabs button
-            Box(
+            Row(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { 
-                        activeWebView?.let { wv ->
-                            try {
-                                if (wv.width > 0 && wv.height > 0) {
-                                    val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.ARGB_8888)
-                                    val canvas = android.graphics.Canvas(bmp)
-                                    wv.draw(canvas)
-                                    currentTab?.let { tab ->
-                                        viewModel.tabThumbnails[tab.id] = bmp
-                                    }
-                                }
-                            } catch(e: Exception) {}
-                        }
-                        onNavigateToTabs() 
-                    }
-                    .padding(4.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.CheckBoxOutlineBlank, "Karty", modifier = Modifier.fillMaxSize())
-                Text(
-                    text = "${tabs.size}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-            
-            Spacer(Modifier.weight(1f))
-            val activeDownloads by remember {
-                derivedStateOf { viewModel.downloads.value.count { it.status == "probíhá" } }
-            }
-            
-            IconButton(onClick = onNavigateToDownloads) {
-                BadgedBox(
-                    badge = {
-                        if (activeDownloads > 0) {
-                            Badge(containerColor = MaterialTheme.colorScheme.error) {
-                                Text("$activeDownloads")
+                IconButton(onClick = { activeWebView?.goBack() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zpět")
+                }
+                IconButton(onClick = { activeWebView?.goForward() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, "Vpřed")
+                }
+                
+                // Tabs button
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { 
+                            activeWebView?.let { wv ->
+                                try {
+                                    if (wv.width > 0 && wv.height > 0) {
+                                        val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.ARGB_8888)
+                                        val canvas = android.graphics.Canvas(bmp)
+                                        wv.draw(canvas)
+                                        currentTab?.let { tab ->
+                                            viewModel.tabThumbnails[tab.id] = bmp
+                                        }
+                                    }
+                                } catch(e: Exception) {}
+                            }
+                            onNavigateToTabs() 
+                        }
+                        .padding(4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.CheckBoxOutlineBlank, "Karty", modifier = Modifier.fillMaxSize())
+                    Text(
+                        text = "${tabs.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                
+                val activeDownloads by remember {
+                    derivedStateOf { viewModel.downloads.value.count { it.status == "probíhá" } }
+                }
+                
+                IconButton(onClick = onNavigateToDownloads) {
+                    BadgedBox(
+                        badge = {
+                            if (activeDownloads > 0) {
+                                Badge(containerColor = profileColor) {
+                                    Text("$activeDownloads", color = Color.White)
+                                }
                             }
                         }
+                    ) {
+                        Icon(Icons.Default.Download, "Stahování")
                     }
-                ) {
-                    Icon(Icons.Default.Download, "Stahování")
                 }
-            }
-            IconButton(onClick = onNavigateToSettings) {
-                Icon(Icons.Default.Menu, "Možnosti")
+                IconButton(onClick = onNavigateToSettings) {
+                    Icon(Icons.Default.Menu, "Možnosti")
+                }
             }
         }
     }

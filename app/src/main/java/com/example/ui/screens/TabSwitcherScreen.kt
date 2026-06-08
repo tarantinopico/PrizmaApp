@@ -1,5 +1,10 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,6 +41,7 @@ import com.example.ui.utils.HapticType
 import com.example.ui.utils.rememberHapticHelper
 
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.LocalIndication
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -102,28 +108,91 @@ fun TabSwitcherScreen(
             }
         }
     ) { padding ->
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 40.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            tabGroups.forEach { group ->
-                item(span = { GridItemSpan(maxLineSpan) }, key = "group_${group.id}") {
-                    GroupHeader(
-                        group = group, 
-                        onToggle = { viewModel.toggleGroupCollapse(group.id) },
-                        onClose = { viewModel.closeGroup(group.id) }
-                    )
+        if (tabs.isEmpty() && tabGroups.isEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(padding).padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(72.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Žádné otevřené karty",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Otevřete novou kartu kliknutím na tlačítko vpravo nahoře",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 40.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                tabGroups.forEach { group ->
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "group_${group.id}") {
+                        GroupHeader(
+                            group = group, 
+                            onToggle = { viewModel.toggleGroupCollapse(group.id) },
+                            onClose = { viewModel.closeGroup(group.id) }
+                        )
+                    }
+                    
+                    if (!group.isCollapsed) {
+                        val groupTabs = tabs.filter { it.groupId == group.id }
+                        items(groupTabs, key = { it.id }) { tab ->
+                            TabCard(
+                                tab = tab,
+                                viewModel = viewModel,
+                                isSelected = tab.id == currentTab?.id,
+                                profileColor = profileColor,
+                                onClick = {
+                                    hapticHelper.perform(HapticType.TAB_ACTION)
+                                    viewModel.selectTab(tab)
+                                    onNavigateBack()
+                                },
+                                onClose = { 
+                                    hapticHelper.perform(HapticType.TAB_ACTION)
+                                    viewModel.closeTab(tab.id) 
+                                },
+                                onLongClick = { 
+                                    hapticHelper.perform(HapticType.LONG_PRESS)
+                                    showGroupDialog = tab 
+                                }
+                            )
+                        }
+                    }
                 }
-                
-                if (!group.isCollapsed) {
-                    val groupTabs = tabs.filter { it.groupId == group.id }
-                    items(groupTabs, key = { it.id }) { tab ->
+
+                val uncategorizedTabs = tabs.filter { it.groupId == null }
+                if (uncategorizedTabs.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }, key = "uncategorized_header") {
+                        Text(
+                            "Bez skupiny",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                        )
+                    }
+                    items(uncategorizedTabs, key = { it.id }) { tab ->
                         TabCard(
                             tab = tab,
                             viewModel = viewModel,
@@ -144,40 +213,6 @@ fun TabSwitcherScreen(
                             }
                         )
                     }
-                }
-            }
-
-            val uncategorizedTabs = tabs.filter { it.groupId == null }
-            if (uncategorizedTabs.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }, key = "uncategorized_header") {
-                    Text(
-                        "Bez skupiny",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
-                    )
-                }
-                items(uncategorizedTabs, key = { it.id }) { tab ->
-                    TabCard(
-                        tab = tab,
-                        viewModel = viewModel,
-                        isSelected = tab.id == currentTab?.id,
-                        profileColor = profileColor,
-                        onClick = {
-                            hapticHelper.perform(HapticType.TAB_ACTION)
-                            viewModel.selectTab(tab)
-                            onNavigateBack()
-                        },
-                        onClose = { 
-                            hapticHelper.perform(HapticType.TAB_ACTION)
-                            viewModel.closeTab(tab.id) 
-                        },
-                        onLongClick = { 
-                            hapticHelper.perform(HapticType.LONG_PRESS)
-                            showGroupDialog = tab 
-                        }
-                    )
                 }
             }
         }
@@ -342,13 +377,28 @@ fun TabCard(
     onClose: () -> Unit,
     onLongClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f),
+        label = "scale"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.7f)
-            .clip(RoundedCornerShape(16.dp))
-            .then(if (isSelected) Modifier.border(3.dp, profileColor, RoundedCornerShape(16.dp)) else Modifier)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+            .aspectRatio(0.65f)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .clip(RoundedCornerShape(20.dp))
+            .then(if (isSelected) Modifier.border(3.dp, profileColor, RoundedCornerShape(20.dp)) else Modifier)
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = onClick, 
+                onLongClick = onLongClick
+            ),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 8.dp else 2.dp)
     ) {
@@ -356,8 +406,8 @@ fun TabCard(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                    .padding(start = 12.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -370,14 +420,14 @@ fun TabCard(
                 )
                 IconButton(
                     onClick = onClose,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(28.dp)
                 ) {
-                    Icon(Icons.Default.Close, "Zavřít", modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Close, "Zavřít", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center
             ) {
                 val thumbnail = viewModel.tabThumbnails[tab.id]
