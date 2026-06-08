@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.entity.ProfileEntity
 import com.example.ui.viewmodels.ProfileViewModel
 import com.example.utils.ProfileUtils
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import com.example.ui.utils.HapticType
 import com.example.ui.utils.rememberHapticHelper
@@ -54,10 +55,13 @@ fun ProfileSelectionScreen(
     val profiles by viewModel.profiles.collectAsStateWithLifecycle()
     val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var hasAutoNavigated by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(activeProfileId) {
-        if (!viewModel.hasHandledInitialNavigation && activeProfileId != null) {
-            viewModel.hasHandledInitialNavigation = true
+        if (!hasAutoNavigated && activeProfileId != null) {
+            hasAutoNavigated = true
             ProfileUtils.setWebViewProfileOrRestart(context, activeProfileId!!)
             onProfileSelected(activeProfileId!!)
         }
@@ -129,10 +133,11 @@ fun ProfileSelectionScreen(
                         profile = profile,
                         onClick = {
                             hapticHelper.perform(HapticType.SWITCH_PROFILE)
-                            viewModel.hasHandledInitialNavigation = true
-                            viewModel.setActiveProfile(profile.id)
-                            ProfileUtils.setWebViewProfileOrRestart(context, profile.id)
-                            onProfileSelected(profile.id)
+                            scope.launch {
+                                viewModel.setActiveProfile(profile.id)
+                                ProfileUtils.setWebViewProfileOrRestart(context, profile.id)
+                                onProfileSelected(profile.id)
+                            }
                         },
                         onLongClick = {
                             hapticHelper.perform(HapticType.LONG_PRESS)
@@ -175,7 +180,9 @@ fun ProfileSelectionScreen(
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
-                if (activeProfileId == profile.id) viewModel.setActiveProfile(null)
+                if (activeProfileId == profile.id) {
+                    scope.launch { viewModel.setActiveProfile(null) }
+                }
                 editDialogProfile = null
             },
             onConfirm = { name, color ->

@@ -21,31 +21,32 @@ class BrowserViewModel(
     private val context: Context,
     val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
-    private val _currentProfileId = MutableStateFlow<Long?>(null)
-    
+    val activeProfileId: StateFlow<Long?> = settingsDataStore.activeProfileId
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        
     val currentTab = MutableStateFlow<TabEntity?>(null)
 
-    val currentProfile: StateFlow<ProfileEntity?> = _currentProfileId.filterNotNull().flatMapLatest { id ->
+    val currentProfile: StateFlow<ProfileEntity?> = activeProfileId.filterNotNull().flatMapLatest { id ->
         repository.getProfileById(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val tabs: StateFlow<List<TabEntity>> = _currentProfileId.filterNotNull().flatMapLatest { id ->
+    val tabs: StateFlow<List<TabEntity>> = activeProfileId.filterNotNull().flatMapLatest { id ->
         repository.getTabsForProfile(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val tabGroups: StateFlow<List<TabGroupEntity>> = _currentProfileId.filterNotNull().flatMapLatest { id ->
+    val tabGroups: StateFlow<List<TabGroupEntity>> = activeProfileId.filterNotNull().flatMapLatest { id ->
         repository.getTabGroupsForProfile(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val bookmarks: StateFlow<List<BookmarkEntity>> = _currentProfileId.filterNotNull().flatMapLatest { id ->
+    val bookmarks: StateFlow<List<BookmarkEntity>> = activeProfileId.filterNotNull().flatMapLatest { id ->
         repository.getBookmarksForProfile(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val history: StateFlow<List<HistoryEntryEntity>> = _currentProfileId.filterNotNull().flatMapLatest { id ->
+    val history: StateFlow<List<HistoryEntryEntity>> = activeProfileId.filterNotNull().flatMapLatest { id ->
         repository.getHistoryForProfile(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val downloads: StateFlow<List<DownloadEntity>> = _currentProfileId.filterNotNull().flatMapLatest { id ->
+    val downloads: StateFlow<List<DownloadEntity>> = activeProfileId.filterNotNull().flatMapLatest { id ->
         repository.getDownloadsForProfile(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -55,23 +56,22 @@ class BrowserViewModel(
     val tabThumbnails = mutableStateMapOf<Long, android.graphics.Bitmap>()
     val webViewStates = mutableMapOf<Long, android.os.Bundle>()
 
-    fun initProfile(profileId: Long) {
-        if (_currentProfileId.value == profileId) return
-        _currentProfileId.value = profileId
-        
+    init {
         viewModelScope.launch {
-            val existingTabs = repository.getTabsForProfile(profileId).firstOrNull() ?: emptyList()
-            if (existingTabs.isEmpty()) {
-                val newId = repository.addTab(profileId, NEW_TAB_URL, "Nová karta")
-                currentTab.value = TabEntity(id = newId, profileId = profileId, url = NEW_TAB_URL, title = "Nová karta")
-            } else {
-                currentTab.value = existingTabs.first()
+            activeProfileId.filterNotNull().collectLatest { profileId ->
+                val existingTabs = repository.getTabsForProfile(profileId).firstOrNull() ?: emptyList()
+                if (existingTabs.isEmpty()) {
+                    val newId = repository.addTab(profileId, NEW_TAB_URL, "Nová karta")
+                    currentTab.value = TabEntity(id = newId, profileId = profileId, url = NEW_TAB_URL, title = "Nová karta")
+                } else {
+                    currentTab.value = existingTabs.first()
+                }
             }
         }
     }
 
     fun addTab(url: String, title: String) {
-        val pid = _currentProfileId.value ?: return
+        val pid = activeProfileId.value ?: return
         viewModelScope.launch {
             val parsedUrl = parseUrl(url)
             val id = repository.addTab(pid, parsedUrl, title)
@@ -81,7 +81,7 @@ class BrowserViewModel(
     }
     
     fun addTabToGroup(url: String, title: String, groupId: Long) {
-        val pid = _currentProfileId.value ?: return
+        val pid = activeProfileId.value ?: return
         viewModelScope.launch {
             val parsedUrl = parseUrl(url)
             val id = repository.addTab(pid, parsedUrl, title)
@@ -97,7 +97,7 @@ class BrowserViewModel(
     }
     
     fun createTabGroup(name: String, colorHex: String, initialTabId: Long?) {
-        val pid = _currentProfileId.value ?: return
+        val pid = activeProfileId.value ?: return
         viewModelScope.launch {
             val groupId = repository.addTabGroup(pid, name, colorHex)
             if (initialTabId != null) {
@@ -138,7 +138,7 @@ class BrowserViewModel(
     }
 
     fun closeAllTabs() {
-        val pid = _currentProfileId.value ?: return
+        val pid = activeProfileId.value ?: return
         viewModelScope.launch {
             repository.deleteAllTabsForProfile(pid)
             repository.deleteAllTabGroupsForProfile(pid)
@@ -188,7 +188,7 @@ class BrowserViewModel(
     }
 
     fun toggleBookmark(url: String, title: String) {
-        val pid = _currentProfileId.value ?: return
+        val pid = activeProfileId.value ?: return
         viewModelScope.launch {
             val existing = repository.getBookmarkByUrl(pid, url)
             if (existing != null) {
@@ -213,14 +213,14 @@ class BrowserViewModel(
     }
 
     fun addToHistory(url: String, title: String) {
-        val pid = _currentProfileId.value ?: return
+        val pid = activeProfileId.value ?: return
         viewModelScope.launch {
             repository.addHistoryEntry(pid, url, title)
         }
     }
 
     fun startDownload(url: String, userAgent: String?, contentDisposition: String?, mimeType: String?, contentLength: Long) {
-        val pid = _currentProfileId.value ?: return
+        val pid = activeProfileId.value ?: return
         
         val request = DownloadManager.Request(Uri.parse(url)).apply {
             setMimeType(mimeType)

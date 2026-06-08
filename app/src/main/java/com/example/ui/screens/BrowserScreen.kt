@@ -92,7 +92,6 @@ fun BrowserScreen(
     ) {}
     
     LaunchedEffect(profileId) {
-        viewModel.initProfile(profileId)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }

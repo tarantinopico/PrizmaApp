@@ -52,7 +52,6 @@ fun TabSwitcherScreen(
     onSwitchProfile: () -> Unit
 ) {
     val hapticHelper = rememberHapticHelper()
-    LaunchedEffect(profileId) { viewModel.initProfile(profileId) }
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     val tabGroups by viewModel.tabGroups.collectAsStateWithLifecycle()
     val currentTab by viewModel.currentTab.collectAsStateWithLifecycle()

@@ -40,7 +40,6 @@ fun DownloadsScreen(
 ) {
     val context = LocalContext.current
     val downloadManager = remember { context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager }
-    LaunchedEffect(profileId) { viewModel.initProfile(profileId) }
     
     val downloads by viewModel.downloads.collectAsStateWithLifecycle(emptyList())
 
@@ -201,8 +200,6 @@ fun SettingsScreen(
     val hapticsIntensity by settingsDataStore.hapticsIntensity.collectAsState(initial = "střední")
     val autoHidePanel by settingsDataStore.autoHidePanel.collectAsState(initial = false)
     val panelStyle by settingsDataStore.panelStyle.collectAsState(initial = "floating")
-
-    LaunchedEffect(profileId) { viewModel.initProfile(profileId) }
     
     Scaffold(
         topBar = {

@@ -151,10 +151,12 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToSettings = { navController.navigate(Settings(args.profileId)) },
                                 onNavigateToDownloads = { navController.navigate(Downloads(args.profileId)) },
                                 onSwitchProfile = { newProfileId ->
-                                    profileViewModel.setActiveProfile(newProfileId)
-                                    com.example.utils.ProfileUtils.setWebViewProfileOrRestart(applicationContext, newProfileId)
-                                    navController.navigate(Browser(newProfileId)) {
-                                        popUpTo(Browser(args.profileId)) { inclusive = true }
+                                    lifecycleScope.launch {
+                                        profileViewModel.setActiveProfile(newProfileId)
+                                        com.example.utils.ProfileUtils.setWebViewProfileOrRestart(applicationContext, newProfileId)
+                                        navController.navigate(Browser(newProfileId)) {
+                                            popUpTo(Browser(args.profileId)) { inclusive = true }
+                                        }
                                     }
                                 },
                                 onNavigateToProfileSelection = {

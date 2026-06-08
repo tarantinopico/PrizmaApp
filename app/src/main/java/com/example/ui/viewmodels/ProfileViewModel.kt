@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.local.datastore.SettingsDataStore
 import com.example.data.local.entity.ProfileEntity
 import com.example.domain.repository.BrowserRepository
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -15,8 +16,6 @@ class ProfileViewModel(
     private val repository: BrowserRepository,
     private val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
-
-    var hasHandledInitialNavigation = false
 
     val profiles: StateFlow<List<ProfileEntity>> = repository.allProfiles
         .stateIn(
@@ -46,10 +45,11 @@ class ProfileViewModel(
         }
     }
 
-    fun setActiveProfile(id: Long?) {
-        viewModelScope.launch {
-            settingsDataStore.setActiveProfileId(id)
-        }
+    suspend fun setActiveProfile(id: Long?) {
+        val currentId = settingsDataStore.activeProfileId.firstOrNull()
+        android.util.Log.d("ProfileSwitch", "Changing activeProfileId from $currentId to $id")
+        settingsDataStore.setActiveProfileId(id)
+        android.util.Log.d("ProfileSwitch", "Successfully changed activeProfileId to $id")
     }
     
     companion object {
