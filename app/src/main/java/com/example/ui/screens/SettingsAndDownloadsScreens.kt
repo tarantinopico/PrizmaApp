@@ -46,10 +46,45 @@ fun DownloadsScreen(
     LaunchedEffect(downloads) {
         val activeDownloads = downloads.filter { it.status == "probíhá" }
         if (activeDownloads.isNotEmpty()) {
-            while (true) {
+            var polling = true
+            while (polling) {
                 delay(1000)
-                // Just to refresh composition if we wanted real progress,
-                // but we rely on Status update for completed.
+                var hasActive = false
+                activeDownloads.forEach { dl ->
+                    if (dl.downloadManagerId != null) {
+                        val q = DownloadManager.Query().setFilterById(dl.downloadManagerId)
+                        val cursor = downloadManager.query(q)
+                        if (cursor.moveToFirst()) {
+                            val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                            val downloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                            val totalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+
+                            if (statusIndex != -1 && downloadedIndex != -1 && totalIndex != -1) {
+                                val status = cursor.getInt(statusIndex)
+                                val downloaded = cursor.getLong(downloadedIndex)
+                                val total = cursor.getLong(totalIndex)
+
+                                val newStatus = when (status) {
+                                    DownloadManager.STATUS_SUCCESSFUL -> "dokončeno"
+                                    DownloadManager.STATUS_FAILED -> "selhalo"
+                                    else -> "probíhá"
+                                }
+                                
+                                val newSize = if (total > 0) total else dl.fileSize
+
+                                if (newStatus != dl.status || newSize != dl.fileSize) {
+                                    viewModel.updateDownload(dl.copy(status = newStatus, fileSize = newSize))
+                                }
+                                
+                                if (newStatus == "probíhá") {
+                                    hasActive = true
+                                }
+                            }
+                        }
+                        cursor.close()
+                    }
+                }
+                polling = hasActive
             }
         }
     }
@@ -94,7 +129,8 @@ fun DownloadsScreen(
                         ),
                         headlineContent = { Text(dl.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         supportingContent = { 
-                            Text("${dl.status} • ${android.text.format.Formatter.formatShortFileSize(context, dl.fileSize)}")
+                            val sizeText = if (dl.fileSize > 0) android.text.format.Formatter.formatShortFileSize(context, dl.fileSize) else "Neznámá velikost"
+                            Text("${dl.status} • $sizeText")
                         },
                         leadingContent = {
                             Icon(Icons.Default.InsertDriveFile, contentDescription = null)

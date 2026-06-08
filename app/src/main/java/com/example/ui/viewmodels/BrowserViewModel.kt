@@ -227,6 +227,12 @@ class BrowserViewModel(
         }
     }
 
+    fun updateDownload(download: DownloadEntity) {
+        viewModelScope.launch {
+            repository.updateDownload(download)
+        }
+    }
+
     fun deleteDownload(downloadId: Long) {
         viewModelScope.launch {
             val d = downloads.value.find { it.id == downloadId }

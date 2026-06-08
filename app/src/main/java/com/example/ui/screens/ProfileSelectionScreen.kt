@@ -49,11 +49,9 @@ fun ProfileSelectionScreen(
     val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    var initialNav by remember { mutableStateOf(false) }
-
     LaunchedEffect(activeProfileId) {
-        if (!initialNav && activeProfileId != null) {
-            initialNav = true
+        if (!viewModel.hasHandledInitialNavigation && activeProfileId != null) {
+            viewModel.hasHandledInitialNavigation = true
             ProfileUtils.setWebViewProfileOrRestart(context, activeProfileId!!)
             onProfileSelected(activeProfileId!!)
         }
@@ -125,6 +123,7 @@ fun ProfileSelectionScreen(
                         profile = profile,
                         onClick = {
                             hapticHelper.perform(HapticType.SWITCH_PROFILE)
+                            viewModel.hasHandledInitialNavigation = true
                             viewModel.setActiveProfile(profile.id)
                             ProfileUtils.setWebViewProfileOrRestart(context, profile.id)
                             onProfileSelected(profile.id)

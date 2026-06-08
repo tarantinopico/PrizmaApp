@@ -16,6 +16,8 @@ class ProfileViewModel(
     private val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
 
+    var hasHandledInitialNavigation = false
+
     val profiles: StateFlow<List<ProfileEntity>> = repository.allProfiles
         .stateIn(
             scope = viewModelScope,

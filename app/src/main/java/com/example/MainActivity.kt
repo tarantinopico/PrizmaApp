@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
             this,
             downloadReceiver,
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+            androidx.core.content.ContextCompat.RECEIVER_EXPORTED
         )
         
         enableEdgeToEdge()
