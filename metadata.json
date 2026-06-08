@@ -1,0 +1,6 @@
+{
+  "name": "Prizma",
+  "description": "A native Android web browser named Prizma",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
