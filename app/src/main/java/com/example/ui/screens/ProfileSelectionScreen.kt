@@ -30,6 +30,8 @@ import com.example.data.local.entity.ProfileEntity
 import com.example.ui.viewmodels.ProfileViewModel
 import com.example.utils.ProfileUtils
 import java.util.Calendar
+import com.example.ui.utils.HapticType
+import com.example.ui.utils.rememberHapticHelper
 
 val PROFILE_COLORS = listOf(
     "#7C5CFF", "#FF5C5C", "#5CFFB6", "#FFB65C", "#5CBAFF"
@@ -42,6 +44,7 @@ fun ProfileSelectionScreen(
     onProfileSelected: (Long) -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
+    val hapticHelper = rememberHapticHelper()
     val profiles by viewModel.profiles.collectAsStateWithLifecycle()
     val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -121,11 +124,13 @@ fun ProfileSelectionScreen(
                     ProfileCard(
                         profile = profile,
                         onClick = {
+                            hapticHelper.perform(HapticType.SWITCH_PROFILE)
                             viewModel.setActiveProfile(profile.id)
                             ProfileUtils.setWebViewProfileOrRestart(context, profile.id)
                             onProfileSelected(profile.id)
                         },
                         onLongClick = {
+                            hapticHelper.perform(HapticType.LONG_PRESS)
                             editDialogProfile = profile
                         }
                     )

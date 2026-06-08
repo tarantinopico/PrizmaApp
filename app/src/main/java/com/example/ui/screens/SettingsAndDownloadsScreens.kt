@@ -21,8 +21,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.PrizmaApp
 import com.example.ui.viewmodels.BrowserViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -139,6 +141,14 @@ fun SettingsScreen(
     viewModel: BrowserViewModel,
     onNavigateBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val app = context.applicationContext as PrizmaApp
+    val settingsDataStore = app.container.settingsDataStore
+    val scope = rememberCoroutineScope()
+    
+    val hapticsEnabled by settingsDataStore.hapticsEnabled.collectAsState(initial = true)
+    val hapticsIntensity by settingsDataStore.hapticsIntensity.collectAsState(initial = "střední")
+
     LaunchedEffect(profileId) { viewModel.initProfile(profileId) }
     
     Scaffold(
@@ -163,6 +173,36 @@ fun SettingsScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Úspora dat", style = MaterialTheme.typography.bodyLarge)
                     Switch(checked = false, onCheckedChange = {})
+                }
+            }
+            
+            item {
+                Spacer(Modifier.height(24.dp))
+                Text("Haptická odezva", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Povolit haptickou odezvu", style = MaterialTheme.typography.bodyLarge)
+                    Switch(
+                        checked = hapticsEnabled,
+                        onCheckedChange = { enabled ->
+                            scope.launch { settingsDataStore.setHapticsEnabled(enabled) }
+                        }
+                    )
+                }
+                
+                if (hapticsEnabled) {
+                    Spacer(Modifier.height(16.dp))
+                    Text("Intenzita vibrací", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        listOf("jemná", "střední", "silná").forEach { intensity ->
+                            FilterChip(
+                                selected = hapticsIntensity == intensity,
+                                onClick = { scope.launch { settingsDataStore.setHapticsIntensity(intensity) } },
+                                label = { Text(intensity.replaceFirstChar { it.uppercase() }) }
+                            )
+                        }
+                    }
                 }
             }
         }

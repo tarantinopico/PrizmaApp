@@ -51,6 +51,8 @@ class BrowserRepository(
     )
     suspend fun clearHistoryForProfile(profileId: Long) = historyDao.clearHistoryForProfile(profileId)
 
+    // Profiles
+
     // Downloads
     fun getDownloadsForProfile(profileId: Long): Flow<List<DownloadEntity>> = downloadDao.getDownloadsForProfile(profileId)
     suspend fun getDownloadByManagerId(downloadManagerId: Long): DownloadEntity? = downloadDao.getDownloadByManagerId(downloadManagerId)

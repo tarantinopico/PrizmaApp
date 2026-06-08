@@ -52,7 +52,12 @@ import android.os.Build
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-// Add the imports and permission logic
+import com.example.ui.utils.HapticType
+import com.example.ui.utils.rememberHapticHelper
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,8 +66,20 @@ fun BrowserScreen(
     viewModel: BrowserViewModel,
     onNavigateToTabs: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToDownloads: () -> Unit
+    onNavigateToDownloads: () -> Unit,
+    onSwitchProfile: (Long) -> Unit,
+    onNavigateToProfileSelection: () -> Unit
 ) {
+    val context = LocalContext.current
+    val hapticHelper = rememberHapticHelper()
+    var contextMenuHitResult by remember { mutableStateOf<WebView.HitTestResult?>(null) }
+    var showGroupSelectorUrl by remember { mutableStateOf<String?>(null) }
+    var showProfileSelectorUrl by remember { mutableStateOf<String?>(null) }
+    var showQuickProfileSwitcher by remember { mutableStateOf(false) }
+    
+    val profiles by viewModel.profiles.collectAsStateWithLifecycle()
+    val tabGroups by viewModel.tabGroups.collectAsStateWithLifecycle()
+    
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {}
@@ -143,11 +160,19 @@ fun BrowserScreen(
                         // Profile indicator
                         Box(
                             modifier = Modifier
-                                .size(24.dp)
+                                .size(32.dp)
                                 .clip(CircleShape)
                                 .background(profileColor)
-                        )
-                        Spacer(Modifier.width(12.dp))
+                                .clickable { showQuickProfileSwitcher = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = currentProfile?.name?.take(1)?.uppercase() ?: "",
+                                color = MaterialTheme.colorScheme.surface,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
 
                         // Address Bar
                         OutlinedTextField(
@@ -300,6 +325,18 @@ fun BrowserScreen(
                                         viewModel.startDownload(defaultUrl, userAgent, contentDisposition, mimetype, contentLength)
                                     }
                                     
+                                    setOnLongClickListener { v ->
+                                        val wv = v as? WebView
+                                        val result = wv?.hitTestResult
+                                        if (result != null && result.type != WebView.HitTestResult.UNKNOWN_TYPE) {
+                                            contextMenuHitResult = result
+                                            hapticHelper.perform(HapticType.LONG_PRESS)
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                    
                                     activeWebView = this
                                 }
                             },
@@ -448,6 +485,288 @@ fun BrowserScreen(
             focusManager.clearFocus()
         } else if (activeWebView?.canGoBack() == true) {
             activeWebView?.goBack()
+        }
+    }
+
+    if (contextMenuHitResult != null) {
+        val hitResult = contextMenuHitResult!!
+        val type = hitResult.type
+        val extra = hitResult.extra
+        
+        val isLink = type == WebView.HitTestResult.SRC_ANCHOR_TYPE || type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
+        val isImage = type == WebView.HitTestResult.IMAGE_TYPE || type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
+        
+        ModalBottomSheet(
+            onDismissRequest = { contextMenuHitResult = null },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 32.dp, top = 8.dp)
+            ) {
+                if (extra != null) {
+                    Text(
+                        text = extra,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                }
+
+                if (isLink) {
+                    ListItem(
+                        headlineContent = { Text("Otevřít na nové kartě") },
+                        leadingContent = { Icon(Icons.Default.Add, null) },
+                        modifier = Modifier.clickable {
+                            if (extra != null) viewModel.addTab(extra, "Načítání...")
+                            contextMenuHitResult = null
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                    if (tabGroups.isNotEmpty()) {
+                        ListItem(
+                            headlineContent = { Text("Otevřít na nové kartě ve skupině…") },
+                            leadingContent = { Icon(Icons.Default.Folder, null) },
+                            modifier = Modifier.clickable {
+                                if (extra != null) {
+                                    showGroupSelectorUrl = extra
+                                }
+                                contextMenuHitResult = null
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                    if (profiles.isNotEmpty()) {
+                        ListItem(
+                            headlineContent = { Text("Otevřít v jiném profilu…") },
+                            leadingContent = { Icon(Icons.Default.Person, null) },
+                            modifier = Modifier.clickable {
+                                if (extra != null) {
+                                    showProfileSelectorUrl = extra
+                                }
+                                contextMenuHitResult = null
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                    ListItem(
+                        headlineContent = { Text("Kopírovat odkaz") },
+                        leadingContent = { Icon(Icons.Default.ContentCopy, null) },
+                        modifier = Modifier.clickable {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("URL", extra))
+                            contextMenuHitResult = null
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                    ListItem(
+                        headlineContent = { Text("Sdílet odkaz") },
+                        leadingContent = { Icon(Icons.Default.Share, null) },
+                        modifier = Modifier.clickable {
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                setType("text/plain")
+                                putExtra(Intent.EXTRA_TEXT, extra)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Sdílet"))
+                            contextMenuHitResult = null
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
+
+                if (isImage) {
+                    if (isLink) HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    
+                    ListItem(
+                        headlineContent = { Text("Stáhnout obrázek") },
+                        leadingContent = { Icon(Icons.Default.Download, null) },
+                        modifier = Modifier.clickable {
+                            if (extra != null) {
+                                viewModel.startDownload(extra, null, null, null, 0)
+                            }
+                            contextMenuHitResult = null
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                    ListItem(
+                        headlineContent = { Text("Otevřít obrázek na nové kartě") },
+                        leadingContent = { Icon(Icons.Default.Image, null) },
+                        modifier = Modifier.clickable {
+                            if (extra != null) viewModel.addTab(extra, "Obrázek")
+                            contextMenuHitResult = null
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                    ListItem(
+                        headlineContent = { Text("Sdílet obrázek") },
+                        leadingContent = { Icon(Icons.Default.Share, null) },
+                        modifier = Modifier.clickable {
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                setType("text/plain")
+                                putExtra(Intent.EXTRA_TEXT, extra)
+                            }
+                            context.startActivity(Intent.createChooser(intent, "Sdílet"))
+                            contextMenuHitResult = null
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
+                
+                if (!isLink && !isImage && type != WebView.HitTestResult.UNKNOWN_TYPE && extra != null) {
+                    ListItem(
+                        headlineContent = { Text("Kopírovat") },
+                        leadingContent = { Icon(Icons.Default.ContentCopy, null) },
+                        modifier = Modifier.clickable {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Text", extra))
+                            contextMenuHitResult = null
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                    ListItem(
+                        headlineContent = { Text("Vyhledat na Googlu") },
+                        leadingContent = { Icon(Icons.Default.Search, null) },
+                        modifier = Modifier.clickable {
+                            viewModel.addTab("https://www.google.com/search?q=${android.net.Uri.encode(extra)}", "Hledat: $extra")
+                            contextMenuHitResult = null
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
+            }
+        }
+    }
+
+    if (showGroupSelectorUrl != null) {
+        AlertDialog(
+            onDismissRequest = { showGroupSelectorUrl = null },
+            title = { Text("Otevřít ve skupině") },
+            text = {
+                LazyColumn {
+                    items(tabGroups) { group ->
+                        Text(
+                            text = group.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.addTabToGroup(showGroupSelectorUrl!!, "Odkaz", group.id)
+                                    showGroupSelectorUrl = null
+                                }
+                                .padding(16.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showGroupSelectorUrl = null }) {
+                    Text("Zrušit")
+                }
+            }
+        )
+    }
+
+    if (showProfileSelectorUrl != null) {
+        AlertDialog(
+            onDismissRequest = { showProfileSelectorUrl = null },
+            title = { Text("Otevřít v jiném profilu") },
+            text = {
+                LazyColumn {
+                    items(profiles) { p ->
+                        Text(
+                            text = p.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.addTabToProfile(showProfileSelectorUrl!!, "Odkaz", p.id)
+                                    showProfileSelectorUrl = null
+                                }
+                                .padding(16.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showProfileSelectorUrl = null }) {
+                    Text("Zrušit")
+                }
+            }
+        )
+    }
+
+    if (showQuickProfileSwitcher) {
+        ModalBottomSheet(
+            onDismissRequest = { showQuickProfileSwitcher = false },
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 32.dp, top = 8.dp)
+            ) {
+                Text(
+                    text = "Přepnout profil",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                LazyColumn {
+                    items(profiles) { p ->
+                        val isCurrent = p.id == profileId
+                        val pColor = try { Color(parseColor(p.accentColorHex)) } catch(e:Exception) { MaterialTheme.colorScheme.primary }
+                        ListItem(
+                            headlineContent = { Text(p.name, style = if (isCurrent) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge) },
+                            leadingContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(pColor),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = p.name.take(1).uppercase(),
+                                        color = MaterialTheme.colorScheme.surface,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
+                            },
+                            trailingContent = {
+                                if (isCurrent) {
+                                    Icon(Icons.Default.Check, null, tint = pColor)
+                                }
+                            },
+                            modifier = Modifier.clickable {
+                                showQuickProfileSwitcher = false
+                                if (!isCurrent) {
+                                    hapticHelper.perform(HapticType.SWITCH_PROFILE)
+                                    onSwitchProfile(p.id)
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                    item {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        ListItem(
+                            headlineContent = { Text("Spravovat profily") },
+                            leadingContent = { Icon(Icons.Default.Settings, null) },
+                            modifier = Modifier.clickable {
+                                showQuickProfileSwitcher = false
+                                hapticHelper.perform(HapticType.SWITCH_PROFILE)
+                                onNavigateToProfileSelection()
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+            }
         }
     }
 }

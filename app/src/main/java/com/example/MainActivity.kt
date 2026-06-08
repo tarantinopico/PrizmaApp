@@ -53,6 +53,19 @@ class MainActivity : ComponentActivity() {
                                     val dl = repo.getDownloadByManagerId(id)
                                     if (dl != null) {
                                         repo.updateDownload(dl.copy(status = stringStatus))
+                                        if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                                            // Vibration on download complete
+                                            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                                            if (vibrator.hasVibrator()) {
+                                                try {
+                                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                                        vibrator.vibrate(android.os.VibrationEffect.createWaveform(longArrayOf(0, 30, 80, 50), -1))
+                                                    } else {
+                                                        vibrator.vibrate(longArrayOf(0, 30, 80, 50), -1)
+                                                    }
+                                                } catch (e: Exception) {}
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -103,6 +116,7 @@ class MainActivity : ComponentActivity() {
                                 viewModel = profileViewModel,
                                 onProfileSelected = { profileId ->
                                     navController.navigate(Browser(profileId)) {
+                                        popUpTo(ProfileSelection) { inclusive = true }
                                         launchSingleTop = true
                                     }
                                 },
@@ -118,7 +132,19 @@ class MainActivity : ComponentActivity() {
                                 viewModel = browserViewModel,
                                 onNavigateToTabs = { navController.navigate(TabSwitcher(args.profileId)) },
                                 onNavigateToSettings = { navController.navigate(Settings(args.profileId)) },
-                                onNavigateToDownloads = { navController.navigate(Downloads(args.profileId)) }
+                                onNavigateToDownloads = { navController.navigate(Downloads(args.profileId)) },
+                                onSwitchProfile = { newProfileId ->
+                                    profileViewModel.setActiveProfile(newProfileId)
+                                    com.example.utils.ProfileUtils.setWebViewProfileOrRestart(applicationContext, newProfileId)
+                                    navController.navigate(Browser(newProfileId)) {
+                                        popUpTo(Browser(args.profileId)) { inclusive = true }
+                                    }
+                                },
+                                onNavigateToProfileSelection = {
+                                    navController.navigate(ProfileSelection) {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
                             )
                         }
                         composable<TabSwitcher> { navBackStackEntry ->

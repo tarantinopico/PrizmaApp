@@ -32,6 +32,9 @@ import com.example.data.local.entity.TabEntity
 import com.example.data.local.entity.TabGroupEntity
 import com.example.ui.viewmodels.BrowserViewModel
 
+import com.example.ui.utils.HapticType
+import com.example.ui.utils.rememberHapticHelper
+
 import androidx.compose.ui.graphics.asImageBitmap
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -42,6 +45,7 @@ fun TabSwitcherScreen(
     onNavigateBack: () -> Unit,
     onSwitchProfile: () -> Unit
 ) {
+    val hapticHelper = rememberHapticHelper()
     LaunchedEffect(profileId) { viewModel.initProfile(profileId) }
     val tabs by viewModel.tabs.collectAsStateWithLifecycle()
     val tabGroups by viewModel.tabGroups.collectAsStateWithLifecycle()
@@ -126,11 +130,18 @@ fun TabSwitcherScreen(
                             isSelected = tab.id == currentTab?.id,
                             profileColor = profileColor,
                             onClick = {
+                                hapticHelper.perform(HapticType.TAB_ACTION)
                                 viewModel.selectTab(tab)
                                 onNavigateBack()
                             },
-                            onClose = { viewModel.closeTab(tab.id) },
-                            onLongClick = { showGroupDialog = tab }
+                            onClose = { 
+                                hapticHelper.perform(HapticType.TAB_ACTION)
+                                viewModel.closeTab(tab.id) 
+                            },
+                            onLongClick = { 
+                                hapticHelper.perform(HapticType.LONG_PRESS)
+                                showGroupDialog = tab 
+                            }
                         )
                     }
                 }
@@ -154,11 +165,18 @@ fun TabSwitcherScreen(
                         isSelected = tab.id == currentTab?.id,
                         profileColor = profileColor,
                         onClick = {
+                            hapticHelper.perform(HapticType.TAB_ACTION)
                             viewModel.selectTab(tab)
                             onNavigateBack()
                         },
-                        onClose = { viewModel.closeTab(tab.id) },
-                        onLongClick = { showGroupDialog = tab }
+                        onClose = { 
+                            hapticHelper.perform(HapticType.TAB_ACTION)
+                            viewModel.closeTab(tab.id) 
+                        },
+                        onLongClick = { 
+                            hapticHelper.perform(HapticType.LONG_PRESS)
+                            showGroupDialog = tab 
+                        }
                     )
                 }
             }
@@ -178,6 +196,7 @@ fun TabSwitcherScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
+                                    hapticHelper.perform(HapticType.DRAG_DROP)
                                     viewModel.assignTabToGroup(tab.id, group.id)
                                     showGroupDialog = null
                                 }
@@ -194,6 +213,7 @@ fun TabSwitcherScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
+                                    hapticHelper.perform(HapticType.DRAG_DROP)
                                     viewModel.assignTabToGroup(tab.id, null)
                                     showGroupDialog = null
                                 }

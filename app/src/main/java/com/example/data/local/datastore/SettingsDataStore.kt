@@ -11,9 +11,19 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "pr
 
 class SettingsDataStore(private val context: Context) {
     private val ACTIVE_PROFILE_ID = longPreferencesKey("active_profile_id")
+    private val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
+    private val HAPTICS_INTENSITY = stringPreferencesKey("haptics_intensity")
 
     val activeProfileId: Flow<Long?> = context.dataStore.data.map { preferences ->
         preferences[ACTIVE_PROFILE_ID]
+    }
+    
+    val hapticsEnabled: Flow<Boolean> = context.dataStore.data.map {
+        it[HAPTICS_ENABLED] ?: true
+    }
+
+    val hapticsIntensity: Flow<String> = context.dataStore.data.map {
+        it[HAPTICS_INTENSITY] ?: "střední"
     }
 
     suspend fun setActiveProfileId(id: Long?) {
@@ -24,5 +34,13 @@ class SettingsDataStore(private val context: Context) {
                 preferences[ACTIVE_PROFILE_ID] = id
             }
         }
+    }
+    
+    suspend fun setHapticsEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[HAPTICS_ENABLED] = enabled }
+    }
+
+    suspend fun setHapticsIntensity(intensity: String) {
+        context.dataStore.edit { it[HAPTICS_INTENSITY] = intensity }
     }
 }

@@ -47,6 +47,9 @@ class BrowserViewModel(
         repository.getDownloadsForProfile(id)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val profiles: StateFlow<List<ProfileEntity>> = repository.allProfiles
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val tabThumbnails = mutableStateMapOf<Long, android.graphics.Bitmap>()
 
     fun initProfile(profileId: Long) {
@@ -71,6 +74,22 @@ class BrowserViewModel(
             val id = repository.addTab(pid, parsedUrl, title)
             val newTab = TabEntity(id = id, profileId = pid, url = parsedUrl, title = title)
             currentTab.value = newTab
+        }
+    }
+    
+    fun addTabToGroup(url: String, title: String, groupId: Long) {
+        val pid = _currentProfileId.value ?: return
+        viewModelScope.launch {
+            val parsedUrl = parseUrl(url)
+            val id = repository.addTab(pid, parsedUrl, title)
+            repository.updateTab(TabEntity(id = id, profileId = pid, url = parsedUrl, title = title, groupId = groupId))
+        }
+    }
+
+    fun addTabToProfile(url: String, title: String, profileId: Long) {
+        viewModelScope.launch {
+            val parsedUrl = parseUrl(url)
+            repository.addTab(profileId, parsedUrl, title)
         }
     }
     
