@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -43,7 +44,8 @@ fun NewTabPage(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(top = 16.dp),
+            .verticalScroll(androidx.compose.foundation.rememberScrollState())
+            .padding(top = 16.dp, bottom = 120.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Logo / Profile indicator
@@ -119,7 +121,9 @@ fun NewTabPage(
                 columns = GridCells.Fixed(4),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = 400.dp)
                     .padding(horizontal = 16.dp),
+                userScrollEnabled = false,
                 contentPadding = PaddingValues(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)

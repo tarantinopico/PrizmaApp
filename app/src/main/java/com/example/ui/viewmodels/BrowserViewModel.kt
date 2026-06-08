@@ -53,6 +53,7 @@ class BrowserViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val tabThumbnails = mutableStateMapOf<Long, android.graphics.Bitmap>()
+    val webViewStates = mutableMapOf<Long, android.os.Bundle>()
 
     fun initProfile(profileId: Long) {
         if (_currentProfileId.value == profileId) return

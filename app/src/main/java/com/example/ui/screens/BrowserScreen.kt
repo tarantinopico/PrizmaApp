@@ -64,6 +64,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 
+import kotlinx.coroutines.launch
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrowserScreen(
@@ -115,6 +117,7 @@ fun BrowserScreen(
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
 
+    val scope = rememberCoroutineScope()
     var bookmarkToEdit by remember { mutableStateOf<com.example.data.local.entity.BookmarkEntity?>(null) }
     var bookmarkNewTitle by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -155,8 +158,7 @@ fun BrowserScreen(
         label = "panelOffset"
     )
 
-    // WebView state cache
-    val webViewStates = remember { mutableMapOf<Long, Bundle>() }
+    val webViewStates = viewModel.webViewStates
     var activeWebView by remember { mutableStateOf<WebView?>(null) }
     
     val profileColor = try {
@@ -284,7 +286,7 @@ fun BrowserScreen(
                                             if (tab.url != BrowserViewModel.NEW_TAB_URL) {
                                                 hapticHelper.perform(HapticType.TAB_ACTION)
                                                 viewModel.toggleBookmark(tab.url, tab.title)
-                                                viewModel.viewModelScope.launch {
+                                                scope.launch {
                                                     val isBookmarked = bookmarks.any { it.url == tab.url }
                                                     val msg = if (isBookmarked) "Odebráno z oblíbených" else "Přidáno do oblíbených"
                                                     snackbarHostState.currentSnackbarData?.dismiss()
@@ -401,6 +403,16 @@ fun BrowserScreen(
                                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                             isLoading = true
                                             if (!isInputFocused) urlInput = url ?: ""
+                                        }
+                                        override fun onReceivedError(
+                                            view: WebView?,
+                                            request: android.webkit.WebResourceRequest?,
+                                            error: android.webkit.WebResourceError?
+                                        ) {
+                                            super.onReceivedError(view, request, error)
+                                            if (request?.isForMainFrame == true) {
+                                                view?.loadDataWithBaseURL(null, "<html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;padding:24px;text-align:center;background:#1e1e1e;color:#ddd}h1{font-size:24px;margin-bottom:8px}p{font-size:14px;color:#aaa}</style></head><body><h1>Nepodařilo se načíst stránku</h1><p>Ověřte své připojení nebo zkuste adresu zadat znovu.</p></body></html>", "text/html", "UTF-8", null)
+                                            }
                                         }
                                         override fun onPageFinished(view: WebView?, url: String?) {
                                             isLoading = false
