@@ -30,10 +30,23 @@ class MainActivity : ComponentActivity() {
     
     private val downloadReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == DownloadManager.ACTION_DOWNLOAD_COMPLETE) {
+            val appContainer = (application as PrizmaApp).container
+            
+            if (intent?.action == DownloadManager.ACTION_NOTIFICATION_CLICKED) {
+                val ids = intent.getLongArrayExtra(DownloadManager.EXTRA_NOTIFICATION_CLICK_DOWNLOAD_IDS)
+                if (ids != null && ids.isNotEmpty()) {
+                    val downloadId = ids[0]
+                    lifecycleScope.launch {
+                        val repo = appContainer.browserRepository
+                        val dl = repo.getDownloadByManagerId(downloadId)
+                        if (dl != null && context != null) {
+                            com.example.utils.FileOpenHelper.openDownloadedFile(context, dl)
+                        }
+                    }
+                }
+            } else if (intent?.action == DownloadManager.ACTION_DOWNLOAD_COMPLETE) {
                 val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
                 if (id != -1L) {
-                    val appContainer = (application as PrizmaApp).container
                     lifecycleScope.launch {
                         // find matching download entity and update its status
                         // Since we don't have a direct query by managerId easily available, 
@@ -81,10 +94,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         // Register download receiver
+        val filter = IntentFilter().apply {
+            addAction(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+            addAction(DownloadManager.ACTION_NOTIFICATION_CLICKED)
+        }
         androidx.core.content.ContextCompat.registerReceiver(
             this,
             downloadReceiver,
-            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            filter,
             androidx.core.content.ContextCompat.RECEIVER_EXPORTED
         )
         

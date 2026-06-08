@@ -401,6 +401,7 @@ fun BrowserScreen(
                                     
                                     webViewClient = object : WebViewClient() {
                                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                            if (url == BrowserViewModel.NEW_TAB_URL || url == "about:blank") return
                                             isLoading = true
                                             if (!isInputFocused) urlInput = url ?: ""
                                         }
@@ -410,11 +411,14 @@ fun BrowserScreen(
                                             error: android.webkit.WebResourceError?
                                         ) {
                                             super.onReceivedError(view, request, error)
+                                            val failingUrl = request?.url?.toString()
+                                            if (failingUrl == BrowserViewModel.NEW_TAB_URL || failingUrl == "about:blank") return
                                             if (request?.isForMainFrame == true) {
                                                 view?.loadDataWithBaseURL(null, "<html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;padding:24px;text-align:center;background:#1e1e1e;color:#ddd}h1{font-size:24px;margin-bottom:8px}p{font-size:14px;color:#aaa}</style></head><body><h1>Nepodařilo se načíst stránku</h1><p>Ověřte své připojení nebo zkuste adresu zadat znovu.</p></body></html>", "text/html", "UTF-8", null)
                                             }
                                         }
                                         override fun onPageFinished(view: WebView?, url: String?) {
+                                            if (url == BrowserViewModel.NEW_TAB_URL || url == "about:blank") return
                                             isLoading = false
                                             url?.let {
                                                 viewModel.updateCurrentTabUrl(it, view?.title ?: "Web Page")
@@ -459,7 +463,11 @@ fun BrowserScreen(
                                     if (savedState != null) {
                                         webView.restoreState(savedState)
                                     } else {
-                                        webView.loadUrl(currentTab!!.url)
+                                        if (currentTab!!.url != BrowserViewModel.NEW_TAB_URL && currentTab!!.url != "about:blank") {
+                                            webView.loadUrl(currentTab!!.url)
+                                        } else {
+                                            webView.loadDataWithBaseURL(null, "", "text/html", "UTF-8", null)
+                                        }
                                     }
                                 }
                             },

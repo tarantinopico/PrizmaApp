@@ -137,17 +137,7 @@ fun DownloadsScreen(
                         modifier = Modifier.combinedClickable(
                             onClick = {
                                 if (dl.status == "dokončeno") {
-                                    val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), dl.fileName)
-                                    if (file.exists()) {
-                                        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-                                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                                            setDataAndType(uri, dl.mimeType.takeIf { it.isNotBlank() } ?: "*/*")
-                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        }
-                                        try {
-                                            context.startActivity(Intent.createChooser(intent, "Otevřít pomocí"))
-                                        } catch (e: Exception) {}
-                                    }
+                                    com.example.utils.FileOpenHelper.openDownloadedFile(context, dl)
                                 }
                             },
                             onLongClick = { showDialog = true }
