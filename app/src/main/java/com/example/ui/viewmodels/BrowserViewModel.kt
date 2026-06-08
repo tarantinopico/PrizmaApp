@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.entity.*
+import com.example.data.local.datastore.SettingsDataStore
 import com.example.domain.repository.BrowserRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -17,7 +18,8 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class BrowserViewModel(
     private val repository: BrowserRepository,
-    private val context: Context
+    private val context: Context,
+    val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
     private val _currentProfileId = MutableStateFlow<Long?>(null)
     
@@ -247,10 +249,10 @@ class BrowserViewModel(
     }
 
     companion object {
-        fun provideFactory(repository: BrowserRepository, context: Context): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+        fun provideFactory(repository: BrowserRepository, context: Context, settingsDataStore: SettingsDataStore): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return BrowserViewModel(repository, context) as T
+                return BrowserViewModel(repository, context, settingsDataStore) as T
             }
         }
     }

@@ -209,6 +209,8 @@ fun SettingsScreen(
     
     val hapticsEnabled by settingsDataStore.hapticsEnabled.collectAsState(initial = true)
     val hapticsIntensity by settingsDataStore.hapticsIntensity.collectAsState(initial = "střední")
+    val autoHidePanel by settingsDataStore.autoHidePanel.collectAsState(initial = false)
+    val panelStyle by settingsDataStore.panelStyle.collectAsState(initial = "floating")
 
     LaunchedEffect(profileId) { viewModel.initProfile(profileId) }
     
@@ -234,6 +236,36 @@ fun SettingsScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Úspora dat", style = MaterialTheme.typography.bodyLarge)
                     Switch(checked = false, onCheckedChange = {})
+                }
+            }
+            
+            item {
+                Spacer(Modifier.height(24.dp))
+                Text("Vzhled a chování", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text("Auto-skrývat panel při scrollu", style = MaterialTheme.typography.bodyLarge)
+                    Switch(
+                        checked = autoHidePanel,
+                        onCheckedChange = { enabled ->
+                            scope.launch { settingsDataStore.setAutoHidePanel(enabled) }
+                        }
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Text("Styl spodního panelu", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = panelStyle == "floating",
+                        onClick = { scope.launch { settingsDataStore.setPanelStyle("floating") } },
+                        label = { Text("Plovoucí") }
+                    )
+                    FilterChip(
+                        selected = panelStyle == "full",
+                        onClick = { scope.launch { settingsDataStore.setPanelStyle("full") } },
+                        label = { Text("Ukotvený (Plný)") }
+                    )
                 }
             }
             

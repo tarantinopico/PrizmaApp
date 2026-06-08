@@ -100,6 +100,10 @@ fun BrowserScreen(
     val history by viewModel.history.collectAsStateWithLifecycle()
     val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
 
+    val autoHidePanel by viewModel.settingsDataStore.autoHidePanel.collectAsStateWithLifecycle(initialValue = false)
+    val panelStyle by viewModel.settingsDataStore.panelStyle.collectAsStateWithLifecycle(initialValue = "floating")
+    var manuallyHidden by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+
     var urlInput by remember { mutableStateOf("") }
     var isInputFocused by remember { mutableStateOf(false) }
     var pageProgress by remember { mutableFloatStateOf(0f) }
@@ -118,18 +122,32 @@ fun BrowserScreen(
 
     // Scroll Connection to hide bottom bar
     var bottomBarOffset by remember { mutableFloatStateOf(0f) }
-    val bottomBarHeight = 80.dp
+    val bottomBarHeight = 84.dp
     val bottomBarHeightPx = with(LocalDensity.current) { bottomBarHeight.roundToPx().toFloat() }
 
-    val nestedScrollConnection = remember {
+    val nestedScrollConnection = remember(autoHidePanel, manuallyHidden) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (!autoHidePanel || manuallyHidden) return Offset.Zero
                 val delta = available.y
-                bottomBarOffset = (bottomBarOffset + delta).coerceIn(-bottomBarHeightPx, 0f)
+                bottomBarOffset = (bottomBarOffset + delta).coerceIn(-bottomBarHeightPx * 2f, 0f)
                 return Offset.Zero
             }
         }
     }
+
+    LaunchedEffect(autoHidePanel, manuallyHidden) {
+        if (!autoHidePanel && !manuallyHidden) {
+             bottomBarOffset = 0f
+        }
+    }
+
+    val targetOffset = if (manuallyHidden) -bottomBarHeightPx * 2f else bottomBarOffset 
+    val animatedOffset by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = targetOffset,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 400f),
+        label = "panelOffset"
+    )
 
     // WebView state cache
     val webViewStates = remember { mutableMapOf<Long, Bundle>() }
@@ -273,6 +291,16 @@ fun BrowserScreen(
                                     },
                                     leadingIcon = { Icon(Icons.Default.Share, null) }
                                 )
+                                DropdownMenuItem(
+                                    text = { Text(if (manuallyHidden) "Zobrazit panel" else "Skrýt panel") },
+                                    onClick = {
+                                        manuallyHidden = !manuallyHidden
+                                        menuExpanded = false
+                                    },
+                                    leadingIcon = { 
+                                        Icon(if (manuallyHidden) Icons.Default.Visibility else Icons.Default.VisibilityOff, null)
+                                    }
+                                )
                             }
                         }
                     }
@@ -290,7 +318,17 @@ fun BrowserScreen(
             }
 
             // MAIN CONTENT (WebView or Suggestions)
-            Box(Modifier.weight(1f)) {
+            val paddingBottomDp = if (panelStyle == "full") {
+                val offDp = with(LocalDensity.current) { (-animatedOffset).toDp() }
+                // Calculate height of the full bar. Roughly 64.dp + navigationBars.
+                val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                val fullHeight = 64.dp + navBarHeight
+                maxOf(0.dp, fullHeight - offDp)
+            } else {
+                0.dp
+            }
+
+            Box(Modifier.weight(1f).padding(bottom = paddingBottomDp)) {
                 if (currentTab != null) {
                     Box(modifier = Modifier
                         .fillMaxSize()
@@ -412,85 +450,111 @@ fun BrowserScreen(
             }
         }
 
-        // BOTTOM BAR
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .offset { IntOffset(0, -bottomBarOffset.roundToInt()) }
-                .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(32.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f))
-                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), RoundedCornerShape(32.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
+        // BOTTOM BAR CONTENT
+        val bottomBarContent: @Composable () -> Unit = {
+            val isFull = panelStyle == "full"
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .then(if (isFull) Modifier else Modifier.padding(start = 16.dp, end = 16.dp, bottom = 24.dp))
+                    .then(if (isFull) Modifier.clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)) else Modifier.clip(RoundedCornerShape(32.dp)))
+                    .background(if (isFull) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f))
+                    .then(if (isFull) Modifier.border(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)) else Modifier.border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), RoundedCornerShape(32.dp)))
+                    .windowInsetsPadding(WindowInsets.navigationBars),
+                contentAlignment = Alignment.Center
             ) {
-                IconButton(onClick = { activeWebView?.goBack() }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zpět")
-                }
-                IconButton(onClick = { activeWebView?.goForward() }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, "Vpřed")
-                }
-                
-                // Tabs button
-                Box(
+                Row(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { 
-                            activeWebView?.let { wv ->
-                                try {
-                                    if (wv.width > 0 && wv.height > 0) {
-                                        val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.ARGB_8888)
-                                        val canvas = android.graphics.Canvas(bmp)
-                                        wv.draw(canvas)
-                                        currentTab?.let { tab ->
-                                            viewModel.tabThumbnails[tab.id] = bmp
-                                        }
-                                    }
-                                } catch(e: Exception) {}
-                            }
-                            onNavigateToTabs() 
-                        }
-                        .padding(4.dp),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(horizontal = if (isFull) 8.dp else 16.dp, vertical = if (isFull) 8.dp else 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.CheckBoxOutlineBlank, "Karty", modifier = Modifier.fillMaxSize())
-                    Text(
-                        text = "${tabs.size}",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                
-                val activeDownloads by remember {
-                    derivedStateOf { viewModel.downloads.value.count { it.status == "probíhá" } }
-                }
-                
-                IconButton(onClick = onNavigateToDownloads) {
-                    BadgedBox(
-                        badge = {
-                            if (activeDownloads > 0) {
-                                Badge(containerColor = profileColor) {
-                                    Text("$activeDownloads", color = Color.White)
+                    IconButton(onClick = { activeWebView?.goBack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Zpět")
+                    }
+                    IconButton(onClick = { activeWebView?.goForward() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, "Vpřed")
+                    }
+                    
+                    // Tabs button
+                    Box(
+                        modifier = Modifier
+                            .size(if (isFull) 40.dp else 44.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { 
+                                activeWebView?.let { wv ->
+                                    try {
+                                        if (wv.width > 0 && wv.height > 0) {
+                                            val bmp = Bitmap.createBitmap(wv.width, wv.height, Bitmap.Config.ARGB_8888)
+                                            val canvas = android.graphics.Canvas(bmp)
+                                            wv.draw(canvas)
+                                            currentTab?.let { tab ->
+                                                viewModel.tabThumbnails[tab.id] = bmp
+                                            }
+                                        }
+                                    } catch(e: Exception) {}
+                                }
+                                onNavigateToTabs() 
+                            }
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.CheckBoxOutlineBlank, "Karty", modifier = Modifier.fillMaxSize())
+                        Text(
+                            text = "${tabs.size}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    
+                    val activeDownloads by remember(viewModel.downloads.value) {
+                        derivedStateOf { viewModel.downloads.value.count { it.status == "probíhá" } }
+                    }
+                    
+                    IconButton(onClick = onNavigateToDownloads) {
+                        BadgedBox(
+                            badge = {
+                                if (activeDownloads > 0) {
+                                    Badge(containerColor = profileColor) {
+                                        Text("$activeDownloads", color = Color.White)
+                                    }
                                 }
                             }
+                        ) {
+                            Icon(Icons.Default.Download, "Stahování")
                         }
-                    ) {
-                        Icon(Icons.Default.Download, "Stahování")
+                    }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Menu, "Možnosti")
                     }
                 }
-                IconButton(onClick = onNavigateToSettings) {
-                    Icon(Icons.Default.Menu, "Možnosti")
-                }
             }
+        }
+
+        Box(
+            modifier = Modifier.align(Alignment.BottomCenter)
+                .offset { IntOffset(0, -animatedOffset.roundToInt()) }
+        ) {
+            bottomBarContent()
+        }
+
+        if (manuallyHidden || animatedOffset < -10f) {
+             SmallFloatingActionButton(
+                  onClick = { 
+                      manuallyHidden = false
+                      bottomBarOffset = 0f 
+                  },
+                  modifier = Modifier
+                      .align(Alignment.BottomEnd)
+                      .padding(16.dp)
+                      .windowInsetsPadding(WindowInsets.navigationBars),
+                  containerColor = MaterialTheme.colorScheme.primaryContainer,
+                  contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+             ) {
+                  Icon(Icons.Default.VerticalAlignTop, "Zobrazit panel")
+             }
         }
     }
 

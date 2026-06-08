@@ -104,7 +104,7 @@ class MainActivity : ComponentActivity() {
                     )
                     
                     val browserViewModel: BrowserViewModel = viewModel(
-                        factory = BrowserViewModel.provideFactory(appContainer.browserRepository, applicationContext)
+                        factory = BrowserViewModel.provideFactory(appContainer.browserRepository, applicationContext, appContainer.settingsDataStore)
                     )
 
                     NavHost(
