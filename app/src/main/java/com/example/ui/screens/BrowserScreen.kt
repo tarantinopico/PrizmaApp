@@ -26,10 +26,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -113,10 +115,14 @@ fun BrowserScreen(
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
 
+    var bookmarkToEdit by remember { mutableStateOf<com.example.data.local.entity.BookmarkEntity?>(null) }
+    var bookmarkNewTitle by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+
     // Sync input with current tab URL when not focused
     LaunchedEffect(currentTab, isInputFocused) {
         if (!isInputFocused) {
-            urlInput = currentTab?.url ?: ""
+            urlInput = if (currentTab?.url == BrowserViewModel.NEW_TAB_URL) "" else currentTab?.url ?: ""
         }
     }
 
@@ -272,17 +278,25 @@ fun BrowserScreen(
                                     leadingIcon = { Icon(Icons.Default.Add, null) }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text(if (bookmarks.any { it.url == currentTab?.url }) "Odebrat záložku" else "Přidat záložku") },
+                                    text = { Text(if (bookmarks.any { it.url == currentTab?.url }) "Odebrat z oblíbených" else "Přidat do oblíbených") },
                                     onClick = {
                                         currentTab?.let { tab ->
-                                            val existing = bookmarks.find { it.url == tab.url }
-                                            if (existing == null) {
-                                                viewModel.addBookmark(tab.url, tab.title)
+                                            if (tab.url != BrowserViewModel.NEW_TAB_URL) {
+                                                hapticHelper.perform(HapticType.TAB_ACTION)
+                                                viewModel.toggleBookmark(tab.url, tab.title)
+                                                viewModel.viewModelScope.launch {
+                                                    val isBookmarked = bookmarks.any { it.url == tab.url }
+                                                    val msg = if (isBookmarked) "Odebráno z oblíbených" else "Přidáno do oblíbených"
+                                                    snackbarHostState.currentSnackbarData?.dismiss()
+                                                    snackbarHostState.showSnackbar(msg)
+                                                }
                                             }
                                         }
                                         menuExpanded = false
                                     },
-                                    leadingIcon = { Icon(Icons.Default.Star, null) }
+                                    leadingIcon = { 
+                                        Icon(if (bookmarks.any { it.url == currentTab?.url }) Icons.Default.Star else Icons.Outlined.Star, null)
+                                    }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Sdílet") },
@@ -333,7 +347,41 @@ fun BrowserScreen(
                     Box(modifier = Modifier
                         .fillMaxSize()
                         .nestedScroll(nestedScrollConnection)) {
-                        AndroidView(
+                        
+                        if (currentTab?.url == BrowserViewModel.NEW_TAB_URL) {
+                            NewTabPage(
+                                profile = currentProfile,
+                                profileColor = profileColor,
+                                bookmarks = bookmarks,
+                                history = history,
+                                onUrlClick = { url ->
+                                    if (currentTab != null) {
+                                        activeWebView?.loadUrl(url)
+                                        // Sometimes webview is not active yet, let's just update viewmodel url
+                                        viewModel.updateCurrentTabUrl(url, "Načítání...")
+                                    } else {
+                                        viewModel.addTab(url, "Načítání...")
+                                    }
+                                    urlInput = url
+                                },
+                                onBookmarkLongCLick = { bookmark ->
+                                    bookmarkToEdit = bookmark
+                                    bookmarkNewTitle = bookmark.title
+                                    hapticHelper.perform(HapticType.LONG_PRESS)
+                                },
+                                onSearchBarClick = {
+                                    focusRequester.requestFocus()
+                                }
+                            )
+                        }
+                        
+                        // Always keep WebView in hierarchy but invisible/gone if NewTabPage is showing,
+                        // or just use Alpha, since removing it might destroy it. Actually doing a simple alpha or offset is safer for WebView.
+                        // Wait, AndroidView can just be composed and visible/invisible or replaced. Re-creating WebView is expensive.
+                        // But wait! If we do `if(url == ...) NewTabPage else AndroidView`, AndroidView is disposed!
+                        // Instead, we just overlay NewTabPage and hide WebView if NEW_TAB_URL.
+                        Box(modifier = Modifier.fillMaxSize().alpha(if (currentTab?.url == BrowserViewModel.NEW_TAB_URL) 0f else 1f)) {
+                            AndroidView(
                             factory = { context ->
                                 WebView(context).apply {
                                     settings.javaScriptEnabled = true
@@ -405,6 +453,8 @@ fun BrowserScreen(
                             },
                             modifier = Modifier.fillMaxSize()
                         )
+                        // Close Box for alpha wrapper
+                        }
                     }
                 }
 
@@ -556,6 +606,11 @@ fun BrowserScreen(
                   Icon(Icons.Default.VerticalAlignTop, "Zobrazit panel")
              }
         }
+        
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 100.dp)
+        )
     }
 
     BackHandler(enabled = isInputFocused || activeWebView?.canGoBack() == true) {
@@ -846,5 +901,39 @@ fun BrowserScreen(
                 }
             }
         }
+    }
+
+    if (bookmarkToEdit != null) {
+        AlertDialog(
+            onDismissRequest = { bookmarkToEdit = null },
+            title = { Text("Spravovat záložku") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = bookmarkNewTitle,
+                        onValueChange = { bookmarkNewTitle = it },
+                        label = { Text("Název") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.updateBookmarkTitle(bookmarkToEdit!!.id, bookmarkNewTitle)
+                    bookmarkToEdit = null
+                }) {
+                    Text("Uložit")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.removeBookmark(bookmarkToEdit!!.id)
+                    bookmarkToEdit = null
+                }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                    Text("Smazat")
+                }
+            }
+        )
     }
 }

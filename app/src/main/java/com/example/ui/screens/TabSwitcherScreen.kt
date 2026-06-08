@@ -83,7 +83,7 @@ fun TabSwitcherScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        viewModel.addTab("https://www.google.com", "Nová karta")
+                        viewModel.addTab(BrowserViewModel.NEW_TAB_URL, "Nová karta")
                         onNavigateBack()
                     }) {
                         Icon(Icons.Default.Add, "Nová karta")

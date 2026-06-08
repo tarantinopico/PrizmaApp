@@ -61,8 +61,8 @@ class BrowserViewModel(
         viewModelScope.launch {
             val existingTabs = repository.getTabsForProfile(profileId).firstOrNull() ?: emptyList()
             if (existingTabs.isEmpty()) {
-                val newId = repository.addTab(profileId, "https://www.google.com", "Nová karta")
-                currentTab.value = TabEntity(id = newId, profileId = profileId, url = "https://www.google.com", title = "Nová karta")
+                val newId = repository.addTab(profileId, NEW_TAB_URL, "Nová karta")
+                currentTab.value = TabEntity(id = newId, profileId = profileId, url = NEW_TAB_URL, title = "Nová karta")
             } else {
                 currentTab.value = existingTabs.first()
             }
@@ -123,7 +123,7 @@ class BrowserViewModel(
                 if (remainingTabs.isNotEmpty()) {
                     currentTab.value = remainingTabs.first()
                 } else {
-                    addTab("https://www.google.com", "Nová karta")
+                    addTab(NEW_TAB_URL, "Nová karta")
                 }
             }
         }
@@ -141,7 +141,7 @@ class BrowserViewModel(
         viewModelScope.launch {
             repository.deleteAllTabsForProfile(pid)
             repository.deleteAllTabGroupsForProfile(pid)
-            addTab("https://www.google.com", "Nová karta")
+            addTab(NEW_TAB_URL, "Nová karta")
         }
     }
 
@@ -158,7 +158,7 @@ class BrowserViewModel(
                     currentTab.value = remainingTabs.first()
                 } else {
                     // Create a new tab if all are closed
-                    addTab("https://www.google.com", "Nová karta")
+                    addTab(NEW_TAB_URL, "Nová karta")
                 }
             }
         }
@@ -177,18 +177,37 @@ class BrowserViewModel(
 
     fun parseUrl(input: String): String {
         val trimmed = input.trim()
-        if (trimmed.isEmpty()) return "https://www.google.com"
+        if (trimmed.isEmpty()) return NEW_TAB_URL
         return when {
             trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
             android.util.Patterns.WEB_URL.matcher(trimmed).matches() -> "https://$trimmed"
+            trimmed.startsWith("prizma://") -> trimmed
             else -> "https://www.google.com/search?q=${android.net.Uri.encode(trimmed)}"
         }
     }
 
-    fun addBookmark(url: String, title: String) {
+    fun toggleBookmark(url: String, title: String) {
         val pid = _currentProfileId.value ?: return
         viewModelScope.launch {
-            repository.addBookmark(pid, url, title)
+            val existing = repository.getBookmarkByUrl(pid, url)
+            if (existing != null) {
+                repository.deleteBookmarkByUrl(pid, url)
+            } else {
+                repository.addBookmark(pid, url, title)
+            }
+        }
+    }
+
+    fun updateBookmarkTitle(id: Long, newTitle: String) {
+        viewModelScope.launch {
+            val bookmark = bookmarks.value.find { it.id == id } ?: return@launch
+            repository.updateBookmark(bookmark.copy(title = newTitle))
+        }
+    }
+
+    fun removeBookmark(id: Long) {
+        viewModelScope.launch {
+            repository.deleteBookmark(id)
         }
     }
 
@@ -249,6 +268,7 @@ class BrowserViewModel(
     }
 
     companion object {
+        const val NEW_TAB_URL = "prizma://newtab"
         fun provideFactory(repository: BrowserRepository, context: Context, settingsDataStore: SettingsDataStore): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {

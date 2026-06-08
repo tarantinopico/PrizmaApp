@@ -39,10 +39,13 @@ class BrowserRepository(
 
     // Bookmarks
     fun getBookmarksForProfile(profileId: Long): Flow<List<BookmarkEntity>> = bookmarkDao.getBookmarksForProfile(profileId)
+    suspend fun getBookmarkByUrl(profileId: Long, url: String) = bookmarkDao.getBookmarkByUrl(profileId, url)
     suspend fun addBookmark(profileId: Long, url: String, title: String) = bookmarkDao.insertBookmark(
         BookmarkEntity(profileId = profileId, url = url, title = title)
     )
+    suspend fun updateBookmark(bookmark: BookmarkEntity) = bookmarkDao.updateBookmark(bookmark)
     suspend fun deleteBookmark(id: Long) = bookmarkDao.deleteBookmark(id)
+    suspend fun deleteBookmarkByUrl(profileId: Long, url: String) = bookmarkDao.deleteBookmarkByUrl(profileId, url)
 
     // History
     fun getHistoryForProfile(profileId: Long): Flow<List<HistoryEntryEntity>> = historyDao.getHistoryForProfile(profileId)
